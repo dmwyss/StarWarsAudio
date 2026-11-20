@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Audio Player Dashboard</title>
+<link rel="stylesheet" href="css/base.v2.css" type="text/css"/>
+<script src="js/dimmer.js"></script>
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- Top Player Block Container -->
+        <div id="playerBlock" class="player-block">
+            <div class="player-left">
+                <div class="player-image-wrap">
+                    <img id="playerImage" class="player-image" src="" alt="Track Cover">
+                </div>
+            </div>
+
+            <div class="player-right">
+                <div class="track-info">
+                    <h2 id="playerTitle" class="track-title">Select an Episode</h2>
+                    <p id="playerFilename" class="track-filename">No track loaded</p>
+                </div>
+
+                <div class="controls-row">
+                    <button id="playBtn" class="play-btn" aria-label="Play/Pause">
+                        <!-- Play Icon SVG -->
+                        <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+
+                    <div class="progress-container">
+                        <div id="sliderWrapper" class="slider-wrapper">
+                            <div id="progressBarFill" class="progress-bar-fill"></div>
+                            <div id="sliderThumb" class="slider-thumb"></div>
+                        </div>
+                        <div class="time-row">
+                            <span id="currentTime">0:00</span>
+                            <span id="totalDuration">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="keyboard-hint">
+                    <span><kbd>←</kbd> / <kbd>→</kbd> 1 min</span>
+                    <span><kbd>Shift</kbd> + <kbd>←</kbd> / <kbd>→</kbd> 10 min</span>
+                    <span><kbd>Spacebar</kbd> Play/Pause</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Gallery Area -->
+        <div id="gallery" class="gallery-block"></div>
+
+    </div>
+
+    <!-- Background Hidden Audio Element -->
+    <audio id="audioElement" preload="auto"></audio>
+    <div class="dimmer">&nbsp;</div>
+    <script>
+        // Dynamic JSON Object representing 6 Mock Episodes
+        const tracksData = [
+            { sTitle: "Episode 1: Phantom Menace", sSoundFileName: "StarWars_Audio_Episode1_ThePhantomMenace_Audio.m4a", sImageFileName: "poster1.1.jpg" },
+            { sTitle: "Episode 2: Attack Of The Clones", sSoundFileName: "StarWars_Audio_Episode2_AttackOfTheClones_Audio.m4a", sImageFileName: "poster2.1.jpg" },
+            { sTitle: "Episode 3.5: Rogue One", sSoundFileName: "StarWars_Audio_Episode3.5_RogueOne_Audio.m4a", sImageFileName: "poster3.5.jpg" },
+            { sTitle: "Episode 4: New Hope", sSoundFileName: "StarWars_Audio_Episode4_ANewHope_Audio.m4a", sImageFileName: "poster4.1.jpg" },
+            { sTitle: "Episode 5: Empire Strikes Back", sSoundFileName: "StarWars_Audio_Episode5_TheEmpireStrikesBack_Audio.m4a", sImageFileName: "poster5.1.jpg" },
+            { sTitle: "Episode 6: Return Of The Jedi", sSoundFileName: "StarWars_Audio_Episode6_ReturnOfTheJedi_Audio.m4a", sImageFileName: "poster6.1.jpg" },
+        ];
+
+        // Core DOM References
+        const galleryContainer = document.getElementById('gallery');
+        const playerBlock = document.getElementById('playerBlock');
+        const playerImage = document.getElementById('playerImage');
+        const playerTitle = document.getElementById('playerTitle');
+        const playerFilename = document.getElementById('playerFilename');
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const sliderWrapper = document.getElementById('sliderWrapper');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const sliderThumb = document.getElementById('sliderThumb');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalDurationEl = document.getElementById('totalDuration');
+        const audio = document.getElementById('audioElement');
+
+        let currentIndex = -1;
+
+        // SVGs for state mutations
+        const playSVG = '<path d="M8 5v14l11-7z"/>';
+        const pauseSVG = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+
+        // 1. Initialize dynamic tracks grid from JSON
+        function initGallery() {
+            galleryContainer.innerHTML = '';
+            tracksData.forEach((track, index) => {
+                const item = document.createElement('div');
+                item.className = 'gallery-item';
+                item.setAttribute('data-index', index);
+
+                item.innerHTML = `
+                    <div class="thumb-wrap">
+                        <img class="thumb-image" src="poster/${track.sImageFileName}" alt="${track.sTitle}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'><rect width=\'100%\' height=\'100%\' fill=\'%23334155\'/><text x=\'50%\' y=\'55%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2394a3b8\'>IMG</text></svg>'">
+                    </div>
+                    <div class="thumb-title">${track.sTitle.split("Episode ").join("Ep")}</div>
+                `;
+
+                item.addEventListener('click', () => selectTrack(index));
+                galleryContainer.appendChild(item);
+            });
+
+            // Auto-select first track on boot without auto-playing immediately
+            selectTrack(0, false);
+        }
+
+        // 2. Select track logic
+        function selectTrack(index, shouldPlay = true) {
+            if (index < 0 || index >= tracksData.length) return;
+            currentIndex = index;
+
+            // Highlight chosen item in grid
+            document.querySelectorAll('.gallery-item').forEach((el, i) => {
+                el.classList.toggle('selected', i === index);
+            });
+
+            // Populate metadata
+            const track = tracksData[index];
+            playerTitle.textContent = track.sTitle;
+            playerFilename.textContent = track.sSoundFileName;
+            playerImage.src = "poster/" + track.sImageFileName;
+
+            // Show / activate player block view
+            playerBlock.classList.add('active');
+
+            // Handle Audio stream loading
+            // Mock file mapping handles cases where real local assets do not exist
+            audio.src = "audio/" + track.sSoundFileName;
+            audio.load();
+
+            if (shouldPlay) {
+                playAudio();
+            } else {
+                pauseAudio();
+                resetProgressUI();
+            }
+        }
+
+        // Playback Management
+        function togglePlay() {
+            if (currentIndex === -1) return;
+            if (audio.paused) {
+                playAudio();
+            } else {
+                pauseAudio();
+            }
+        }
+
+        function playAudio() {
+            // Note: Modern browsers block autoplays until a gesture event triggers it
+            audio.play().catch(e => console.log("Playback interaction placeholder triggered."));
+            playIcon.innerHTML = pauseSVG;
+            playerBlock.classList.add('playing');
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            playIcon.innerHTML = playSVG;
+            playerBlock.classList.remove('playing');
+        }
+
+        function resetProgressUI() {
+            progressBarFill.style.width = '0%';
+            sliderThumb.style.left = '0%';
+            currentTimeEl.textContent = '0:00';
+            totalDurationEl.textContent = '0:00';
+        }
+
+        // Time Formatting Helper (MM:SS)
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Audio Stream Tracking Subscriptions
+        audio.addEventListener('timeupdate', () => {
+            if (!audio.duration) return;
+            const percentage = (audio.currentTime / audio.duration) * 100;
+            progressBarFill.style.width = `${percentage}%`;
+            sliderThumb.style.left = `${percentage}%`;
+            currentTimeEl.textContent = formatTime(audio.currentTime);
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            totalDurationEl.textContent = formatTime(audio.duration);
+        });
+
+        // Mock continuous progression handler if local audio resource files aren't physically deployed locally
+        audio.addEventListener('error', () => {
+            if(audio.duration) return;
+            // Provide a graceful layout mock length fallback for demonstration purposes
+            totalDurationEl.textContent = "45:00";
+        });
+
+        // Custom Progress scrubbing bar click / drag logic
+        function scrub(e) {
+            // Fallback duration to 45 mins (2700s) if local physical media files don't resolve
+            const trackDuration = audio.duration || 2700;
+            const rect = sliderWrapper.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const width = rect.width;
+            let percentage = clickX / width;
+            if (percentage < 0) percentage = 0;
+            if (percentage > 1) percentage = 1;
+
+            progressBarFill.style.width = `${percentage * 100}%`;
+            sliderThumb.style.left = `${percentage * 100}%`;
+
+            const targetTime = percentage * trackDuration;
+            currentTimeEl.textContent = formatTime(targetTime);
+
+            if (audio.duration) {
+                audio.currentTime = targetTime;
+            }
+        }
+
+        // Drag listeners for slider scrubbing
+        let isScrubbing = false;
+        sliderWrapper.addEventListener('mousedown', (e) => {
+            isScrubbing = true;
+            scrub(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isScrubbing) scrub(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isScrubbing = false;
+        });
+
+        // Button clicks
+        playBtn.addEventListener('click', togglePlay);
+
+        // 3. Trapping Keyboard Events & Time jumps
+        window.addEventListener('keydown', (e) => {
+            // Prevent scrolling actions for media control buttons
+            if (["Space", "ArrowLeft", "ArrowRight"].includes(e.code)) {
+                e.preventDefault();
+            }
+
+            const trackDuration = audio.duration || 2700; // Mock 45 mins fallback if asset isn't mounted
+
+            if (e.code === 'Space') {
+                togglePlay();
+            } else if (e.code === 'ArrowLeft') {
+                // Determine Jump Window
+                const jumpAmount = e.shiftKey ? 600 : 60; // 10 minutes vs 1 minute
+                if (audio.duration) {
+                    audio.currentTime = Math.max(0, audio.currentTime - jumpAmount);
+                } else {
+                    // Manual mockup tracking change
+                    let fakeTime = parseTimeToSeconds(currentTimeEl.textContent);
+                    fakeTime = Math.max(0, fakeTime - jumpAmount);
+                    updateMockTimeProgress(fakeTime, trackDuration);
+                }
+                triggerPulseAnimation('left');
+            } else if (e.code === 'ArrowRight') {
+                const jumpAmount = e.shiftKey ? 600 : 60; // 10 minutes vs 1 minute
+                if (audio.duration) {
+                    audio.currentTime = Math.min(trackDuration, audio.currentTime + jumpAmount);
+                } else {
+                    // Manual mockup tracking change
+                    let fakeTime = parseTimeToSeconds(currentTimeEl.textContent);
+                    fakeTime = Math.min(trackDuration, fakeTime + jumpAmount);
+                    updateMockTimeProgress(fakeTime, trackDuration);
+                }
+                triggerPulseAnimation('right');
+            }
+        });
+
+        // Helpers for abstract environment validation
+        function parseTimeToSeconds(timeStr) {
+            const parts = timeStr.split(':');
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+        function updateMockTimeProgress(time, total) {
+            const pct = (time / total) * 100;
+            progressBarFill.style.width = `${pct}%`;
+            sliderThumb.style.left = `${pct}%`;
+            currentTimeEl.textContent = formatTime(time);
+        }
+
+        // Fun dynamic button feedback animations on key action trigger
+        function triggerPulseAnimation(direction) {
+            sliderWrapper.style.transition = 'none';
+            sliderWrapper.style.boxShadow = `0 0 15px ${direction === 'right' ? '#CFF' : '#54b1ff'}`;
+            setTimeout(() => {
+                sliderWrapper.style.transition = 'box-shadow 0.4s ease';
+                sliderWrapper.style.boxShadow = 'none';
+            }, 200);
+        }
+
+        // Fire
+        initGallery();
+        dimmer.init();
+    </script>
+
+</body>
+</html>
