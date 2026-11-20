@@ -1,0 +1,72 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+body {
+    background-color: black;
+    background-image: url("../img/bgStars02.jpg");
+    background-size: 2000px auto;
+    padding: 10px;
+}
+audio {
+    height: 444px;
+    width: 300px;
+    display:none;
+}
+figure {
+    display: inline-block;
+    border-radius: 8px;
+    width: 300px;
+    height: 450px;
+    border: 1px solid #CCC5;
+    background-image: url("../img/poster00.all.jpg");
+    background-origin: 0px 0px;
+    background-position: 0px 0px;
+    background-repeat: no-repeat;
+    background-size: 1200px auto;
+    margin: 5px 5px 0 0;
+}
+figure:hover audio {
+    display: block;
+}
+figure:hover {
+    border: 1px solid #CCC;
+}
+figure#SW_2 {
+    background-position: -300px 0px;
+}
+figure#SW_35 {
+    background-position: -300px -900px;
+}
+figure#SW_4 {
+    background-position: -900px 0px;
+}
+figure#SW_5 {
+    background-position: 0px -450px;
+}
+figure#SW_6 {
+    background-position: -300px -450px;
+}
+div.dimmer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 10%;
+    height: 10%;
+    background-color: #000;
+    opacity: 0.0;
+    transition: opacity 1s ease-in-out;
+}
+figure audio[controls] {
+    bottom: 0px;
+    /*
+    height: 450px;
+    height: 50px;
+    width: calc(100% - 50px);
+    position: absolute;
+    XXXdisplay: block !important;
+    margin: auto 0;
+    left: 25px;
+    position: absolute;
+    */
+}
